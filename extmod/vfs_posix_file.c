@@ -37,7 +37,7 @@
 
 #ifdef _WIN32
 #define fsync _commit
-#else
+#elif MICROPY_PY_SELECT && !MICROPY_PY_SELECT_POSIX_OPTIMISATIONS
 #include <poll.h>
 #endif
 

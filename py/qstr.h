@@ -88,7 +88,7 @@ typedef struct _qstr_pool_t {
     qstr_hash_t *hashes;
     #endif
     qstr_len_t *lengths;
-    const char *qstrs[];
+    const char *qstrs[MP_QSTRnumber_of_static + 1];
 } qstr_pool_t;
 
 #define QSTR_TOTAL() (MP_STATE_VM(last_pool)->total_prev_len + MP_STATE_VM(last_pool)->len)

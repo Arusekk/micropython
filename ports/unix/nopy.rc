@@ -1,0 +1,90 @@
+#!/bin/rc -x
+
+rfork e
+
+nl='
+'
+
+switch($1){
+case *makeversionhdr.py
+	shift
+	out=$1
+	test -e $out || touch $out
+case *makeqstrdefs.py
+	shift
+	switch($1){
+	case pp
+		while(! ~ $#* 0){
+			switch($1){
+			case pp;	tok=$1
+			case output;	tok=$1
+			case cflags;	tok=$1
+			case cxxflags;	tok=$1
+			case sources;	tok=$1
+			case changed_sources;	tok=$1
+			case dependencies;	tok=$1
+			case *
+				$tok=($$tok $1)
+			}
+			shift
+		}
+		$pp $cflags $sources > $output
+	case split
+		shift
+		mode=$1
+		inp=$2
+		out=$3
+		mkdir -p $out
+		switch($mode){
+		case qstr
+			re='MP_QSTR_[_a-zA-Z0-9]+'
+		case *
+			exit unknown mode $1
+		}
+		awk <$inp '/^#(line)? +[0-9]+ +"/ {
+			o = $3
+			gsub(/"/, "", o)
+			gsub(/[\/\\]/, "__", o)
+			gsub(/:/, "@", o)
+			gsub(/\.\./, "@@", o)
+			out="'$out/'" o "'.$mode'"
+		}
+		match($0, /'$re'/) {
+			printf "Q(%s)\n", substr($0, RSTART+8, RLENGTH-8) > out
+		}'
+	case cat
+		shift
+		mode=$1
+		inp=$2
+		out=$3
+		outf=$4
+		sort $out/*.$mode > $outf
+	case *
+		echo unknown command $1 >[1=2]
+		exit usage
+	}
+case *makeqstrdata.py
+	shift
+	echo '// autogen by nopy.rc'
+	echo 'QDEF0(MP_QSTRnull, 0, 0, "")'
+
+	awk < ../../py/makeqstrdata.py '/^static_qstr_list =/,/^]/{
+		o = $0
+		if (gsub(/^[^"]*"/, "", o)) {
+			gsub(/"[^"]*$/, "", o)
+			printf "QSTR0(MP_QSTR_%s, %d, %d, \"%s\")\n", o, 137, length(o), o
+		}
+	}'
+
+	awk '/Q(.*)/{
+		o = $0
+		gsub(/^Q\(/, "", o)
+		gsub(/\)$/, "", o)
+		printf "QSTR%d(MP_QSTR_%s, %d, %d, \"%s\")\n", 1, o, 137, length(o), o
+	}' $* | sort -u
+	exit
+case *
+	echo unknown script $1 >[1=2]
+	exit usage
+}
+

@@ -30,10 +30,10 @@
 #include <stdarg.h>
 #include <assert.h>
 
+#if MICROPY_EMIT_INLINE_XTENSA
+
 #include "py/emit.h"
 #include "py/asmxtensa.h"
-
-#if MICROPY_EMIT_INLINE_XTENSA
 
 struct _emit_inline_asm_t {
     asm_xtensa_t as;

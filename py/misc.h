@@ -57,7 +57,7 @@ typedef unsigned int uint;
 // do, others only with -Werror=vla, msvc always does.
 // The (void) is needed to avoid "left operand of comma operator has no effect [-Werror=unused-value]"
 // when using this macro on the left-hand side of a comma.
-#if defined(_MSC_VER) || defined(__cplusplus)
+#if defined(_MSC_VER) || defined(__cplusplus) || defined(PLAN9)
 #define MP_STATIC_ASSERT_NONCONSTEXPR(cond) ((void)1)
 #else
 #define MP_STATIC_ASSERT_NONCONSTEXPR(cond) MP_STATIC_ASSERT(cond)
@@ -294,7 +294,7 @@ typedef union _mp_float_union_t {
 
 // Force usage of the MP_ERROR_TEXT macro by requiring an opaque type.
 typedef struct {
-    #if defined(__clang__) || defined(_MSC_VER)
+    #if defined(__clang__) || defined(_MSC_VER) || defined(PLAN9)
     // Fix "error: empty struct has size 0 in C, size 1 in C++", and the msvc counterpart
     // "C requires that a struct or union have at least one member"
     char dummy;
@@ -375,10 +375,6 @@ static inline uint32_t mp_popcount(uint32_t x) {
     return __popcnt(x);
 }
 #else
-#define mp_clz(x) __builtin_clz(x)
-#define mp_clzl(x) __builtin_clzl(x)
-#define mp_clzll(x) __builtin_clzll(x)
-#define mp_ctz(x) __builtin_ctz(x)
 #define mp_check(x) (x)
 #if defined __has_builtin
 #if __has_builtin(__builtin_popcount)
@@ -393,6 +389,24 @@ static inline uint32_t mp_popcount(uint32_t x) {
     return x * 0x01010101;
 }
 #endif
+static inline uint32_t mp_clz(uint32_t x) {
+	x |= x >> 1;
+	x |= x >> 2;
+	x |= x >> 4;
+	x |= x >> 8;
+	x |= x >> 16;
+	return 32 - mp_popcount(x);
+}
+static inline uint32_t mp_clzl(unsigned long x) {
+	return mp_clz(x);
+}
+static inline uint32_t mp_clzll(unsigned long long x) {
+    unsigned long h = x >> 32;
+    return h ? mp_clzl(h) : (mp_clzl((unsigned long)x) + 32);
+}
+static inline uint32_t mp_ctz(uint32_t x) {
+	return mp_popcount((x & -x) - 1);
+}
 #endif
 
 // mp_int_t can be larger than long, i.e. Windows 64-bit, nan-box variants

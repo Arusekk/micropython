@@ -1,0 +1,22 @@
+VARIANT=minimal
+all:V:
+	DEFS='
+		PLAN9
+		MICROPY_NO_ALLOCA
+		MP_ENDIANNESS_LITTLE
+		NORETURN=_Noreturn
+		MP_ALWAYSINLINE=static
+		MP_NOINLINE=
+		PATH_MAX=4096
+		MICROPY_PY_OS_STATVFS=0
+		usleep=sleep
+		MP_LIKELY=mp_check
+		MP_UNLIKELY=mp_check
+		MICROPY_PY_BUILTINS_BYTEARRAY
+		''realpath(src,dst)=strcpy(dst,src)''
+	'
+	CFLAGS=-D^`{echo $DEFS}
+	CFLAGS=$"CFLAGS
+	# bytearray = dependency bug hidden by --gc-sections
+	# -D_DIRENT_HAVE_D_INO=0 -D_DIRENT_HAVE_D_TYPE=0  # checks for defined, not value
+	ape/psh -c 'gmake CC=cc PYTHON=nopy.rc COPT=-Og CWARN= MICROPY_ROM_TEXT_COMPRESSION=0 LDFLAGS=-lbsd'

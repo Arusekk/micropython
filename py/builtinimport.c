@@ -289,7 +289,7 @@ static void evaluate_relative_import(mp_int_t level, const char **module_name, s
     #endif
 
     // If we have a __path__ in the globals dict, then we're a package.
-    bool is_pkg = mp_map_lookup(&mp_globals_get()->map, MP_OBJ_NEW_QSTR(MP_QSTR___path__), MP_MAP_LOOKUP);
+    bool is_pkg = mp_map_lookup(&mp_globals_get()->map, MP_OBJ_NEW_QSTR(MP_QSTR___path__), MP_MAP_LOOKUP) ? 1 : 0;
 
     #if DEBUG_PRINT
     DEBUG_printf("Current module/package: ");

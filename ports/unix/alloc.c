@@ -28,11 +28,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 
 #include "py/mpstate.h"
 
 #if MICROPY_EMIT_NATIVE
+#include <sys/mman.h>
 
 #if defined(__OpenBSD__) || defined(__MACH__)
 #define MAP_ANONYMOUS MAP_ANON

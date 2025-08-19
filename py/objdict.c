@@ -40,12 +40,12 @@ bool mp_obj_is_dict_or_ordereddict(mp_obj_t o) {
 const mp_obj_dict_t mp_const_empty_dict_obj = {
     .base = { .type = &mp_type_dict },
     .map = {
-        .all_keys_are_qstrs = 0,
-        .is_fixed = 1,
-        .is_ordered = 1,
-        .used = 0,
-        .alloc = 0,
-        .table = NULL,
+        /*.all_keys_are_qstrs = */ 0,
+        /*.is_fixed = */ 1,
+        /*.is_ordered = */ 1,
+        /*.used = */ 0,
+        /*.alloc = */ 0,
+        /*.table = */ NULL,
     }
 };
 

@@ -690,7 +690,7 @@ struct _mp_obj_type_t {
     // A dict mapping qstrs to objects local methods/constants/etc.
     uint8_t slot_index_locals_dict;
 
-    const void *slots[];
+    const void *slots[12];
 };
 
 // Non-variable sized versions of mp_obj_type_t to be used as a member

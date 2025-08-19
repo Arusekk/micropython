@@ -30,10 +30,10 @@
 #include <stdarg.h>
 #include <assert.h>
 
+#if MICROPY_EMIT_INLINE_THUMB
+
 #include "py/emit.h"
 #include "py/asmthumb.h"
-
-#if MICROPY_EMIT_INLINE_THUMB
 
 typedef enum {
 // define rules with a compile function

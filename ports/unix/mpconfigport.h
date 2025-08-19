@@ -42,6 +42,8 @@
 #ifndef MICROPY_PY_SYS_PLATFORM
 #if defined(__APPLE__) && defined(__MACH__)
     #define MICROPY_PY_SYS_PLATFORM  "darwin"
+#elif defined(PLAN9)
+    #define MICROPY_PY_SYS_PLATFORM  "plan9"
 #else
     #define MICROPY_PY_SYS_PLATFORM  "linux"
 #endif
@@ -202,12 +204,12 @@ static inline unsigned long mp_random_seed_init(void) {
 // Other libc's don't define it, but proactively assume that dirent->d_type
 // is available on a modern *nix system.
 #ifndef _DIRENT_HAVE_D_TYPE
-#define _DIRENT_HAVE_D_TYPE (1)
+//#define _DIRENT_HAVE_D_TYPE (1)
 #endif
 // This macro is not provided by glibc but we need it so ports that don't have
 // dirent->d_ino can disable the use of this field.
 #ifndef _DIRENT_HAVE_D_INO
-#define _DIRENT_HAVE_D_INO (1)
+//#define _DIRENT_HAVE_D_INO (1)
 #endif
 
 #ifndef __APPLE__
@@ -216,8 +218,9 @@ static inline unsigned long mp_random_seed_init(void) {
 #endif
 
 // Configure the implementation of machine.idle().
-#include <sched.h>
-#define MICROPY_UNIX_MACHINE_IDLE sched_yield();
+//#include <sched.h>
+//#define MICROPY_UNIX_MACHINE_IDLE sched_yield();
+#define MICROPY_UNIX_MACHINE_IDLE ;
 
 #ifndef MICROPY_PY_BLUETOOTH_ENABLE_CENTRAL_MODE
 #define MICROPY_PY_BLUETOOTH_ENABLE_CENTRAL_MODE (1)
