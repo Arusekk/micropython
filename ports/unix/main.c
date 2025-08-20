@@ -451,6 +451,10 @@ static void set_sys_argv(char *argv[], int argc, int start_arg) {
     }
 }
 
+char *realpath(const char *from, char *to) {
+    strcpy(to, from);
+}
+
 #if MICROPY_PY_SYS_EXECUTABLE
 extern mp_obj_str_t mp_sys_executable_obj;
 static char executable_path[MICROPY_ALLOC_PATH_MAX];

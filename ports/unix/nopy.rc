@@ -9,7 +9,17 @@ switch($1){
 case *makeversionhdr.py
 	shift
 	out=$1
-	test -e $out || touch $out
+	>$out {
+	echo '// autogen by nopy.rc'
+	echo '#define MICROPY_GIT_TAG "'v`{awk <../../py/mpconfig.h '
+		/^#define MICROPY_VERSION_MAJOR/{printf "%s.", $3}
+		/^#define MICROPY_VERSION_MINOR/{printf "%s.", $3}
+		/^#define MICROPY_VERSION_MICRO/{printf "%s", $3}
+		/^#define MICROPY_VERSION_PRERELEASE/{printf "%s", ($3!=0 ? "-preview" : "")}
+	'}'"'
+	echo '#define MICROPY_GIT_HASH "<no hash>"'
+	echo '#define MICROPY_BUILD_DATE "'`{date -f YYYY-MM-DD}'"'
+	}
 case *makeqstrdefs.py
 	shift
 	switch($1){
@@ -35,11 +45,18 @@ case *makeqstrdefs.py
 		inp=$2
 		out=$3
 		mkdir -p $out
+		fmt='"%s\n", substr($0, 1, RLENGTH)'
 		switch($mode){
 		case qstr
 			re='MP_QSTR_[_a-zA-Z0-9]+'
+			fmt='"Q(%s)\n", substr($0, 9, RLENGTH-8)'
+		case module
+			re='MP_REGISTER_(MODULE|EXTENSIBLE_MODULE|MODULE_DELEGATION)\(.*?, *.*?\);'
+		case root_pointer
+			re='MP_REGISTER_ROOT_POINTER\(.*?\);'
 		case *
-			exit unknown mode $1
+			echo unknown mode $1 >[1=2]
+			exit usage
 		}
 		awk <$inp '/^#(line)? +[0-9]+ +"/ {
 			o = $3
@@ -47,10 +64,20 @@ case *makeqstrdefs.py
 			gsub(/[\/\\]/, "__", o)
 			gsub(/:/, "@", o)
 			gsub(/\.\./, "@@", o)
+			if (out in opened)
+				close(out)
 			out="'$out/'" o "'.$mode'"
 		}
 		match($0, /'$re'/) {
-			printf "Q(%s)\n", substr($0, RSTART+8, RLENGTH-8) > out
+			do {
+				$0=substr($0, RSTART)
+				if (out in opened)
+					printf '$fmt' >> out
+				else
+					printf '$fmt' > out
+				$0=substr($0, 2)
+			} while (match($0, /'$re'/))
+			opened[out]=1
 		}'
 	case cat
 		shift
@@ -58,30 +85,136 @@ case *makeqstrdefs.py
 		inp=$2
 		out=$3
 		outf=$4
-		sort $out/*.$mode > $outf
+		files=($out/*.$mode)
+		if (~ $#files 1 && ~ $files $out/'*'.$mode)
+			files=/dev/null
+		sort $files > $outf
 	case *
 		echo unknown command $1 >[1=2]
 		exit usage
 	}
+case *makemoduledefs.py
+	shift
+	echo '// autogen by nopy.rc'
+	echo
+
+	awk '
+	match($0, /MP_REGISTER_(EXTENSIBLE_)?MODULE\(MP_QSTR_(.*?), *(.*?)\);/){
+		macro=name=obj=substr($0, RSTART, RLENGTH)
+		gsub(/\(.*$/, "", macro)
+		gsub(/^.*?QSTR_/, "", name)
+		gsub(/,.*$/, "", name)
+		gsub(/^.*?, */, "", obj)
+		gsub(/\);$/, "", obj)
+		mod_def = "MODULE_DEF_" name
+		printf "extern const struct _mp_obj_module_t %s;\n", obj
+                printf "#undef %s\n", mod_def
+                printf "#define %s\t{ MP_ROM_QSTR(MP_QSTR_%s),\tMP_ROM_PTR(&%s) },\n", mod_def, name, obj
+		if (macro ~ /EXTENSIBLE/)
+			ext[mod_def] = 1
+		else
+			mod[mod_def] = 1
+	}
+	match($0, /MP_REGISTER_MODULE_DELEGATION\((.*?), *(.*?)\);/){
+		name=fun=substr($0, RSTART, RLENGTH)
+		gsub(/^.*?\(/, "", name)
+		gsub(/,.*$/, "", name)
+		gsub(/^.*?, */, "", fun)
+		gsub(/\);$/, "", fun)
+		printf "extern void %s(mp_obj_t self_in, qstr attr, mp_obj_t *dest);\n", fun
+		deleg[name] = fun
+	}
+	END{
+		print "\n#define MICROPY_REGISTERED_MODULES \\"
+		for (mod_def in mod)
+			printf "\t%s\t\\\n", mod_def
+		print "// MICROPY_REGISTERED_MODULES"
+		print "\n#define MICROPY_REGISTERED_EXTENSIBLE_MODULES \\"
+		for (mod_def in ext)
+			printf "\t%s\t\\\n", mod_def
+		print "// MICROPY_REGISTERED_EXTENSIBLE_MODULES"
+		print "\n#define MICROPY_MODULE_DELEGATIONS \\"
+		for (name in deleg)
+			printf "\t{ MP_ROM_PTR(&%s),\t%s },\t\\\n", name, deleg[name]
+		print "// MICROPY_MODULE_DELEGATIONS"
+	}
+	' $*
+case *make_root_pointers.py
+	shift
+	echo '// autogen by nopy.rc'
+	echo
+	awk '
+	match($0, /MP_REGISTER_ROOT_POINTER\((.*?)\);/){
+		dcl=substr($0, RSTART+25, RLENGTH-27)
+		printf "%s;\n", dcl
+	}
+	' $*
+
 case *makeqstrdata.py
 	shift
 	echo '// autogen by nopy.rc'
+	echo
 	echo 'QDEF0(MP_QSTRnull, 0, 0, "")'
 
-	awk < ../../py/makeqstrdata.py '/^static_qstr_list =/,/^]/{
-		o = $0
-		if (gsub(/^[^"]*"/, "", o)) {
-			gsub(/"[^"]*$/, "", o)
-			printf "QSTR0(MP_QSTR_%s, %d, %d, \"%s\")\n", o, 137, length(o), o
+	awk '
+	function safeid(o){
+		gsub(/\\n/, "_0x0a_", o)
+		gsub(/ /, "_space_", o)
+		gsub(/\//, "_slash_", o)
+		gsub(/\*/, "_star_", o)
+		gsub(/</, "_lt_", o)
+		gsub(/>/, "_gt_", o)
+		gsub(/-/, "_hyphen_", o)
+		gsub(/:/, "_colon_", o)
+		gsub(/#/, "_hash_", o)
+		gsub(/\{/, "_brace_open_", o)
+		gsub(/\}/, "_brace_close_", o)
+		return o
+	}
+	function hash(i,j,b,hash){
+		hash = 5381
+		for(i=1;i<=length($0);i++) {
+			b = ord[substr($0, i, 1)]
+			hash = (hash * 33) % 65536
+			# hash ^= b
+			for(j=1;j<256;j*=2)
+				if(b%(2*j)-b%j != 0)
+					hash += (hash%(2*j)-hash%j == 0 ? j : -j)
 		}
-	}'
-
-	awk '/Q(.*)/{
-		o = $0
-		gsub(/^Q\(/, "", o)
-		gsub(/\)$/, "", o)
-		printf "QSTR%d(MP_QSTR_%s, %d, %d, \"%s\")\n", 1, o, 137, length(o), o
-	}' $* | sort -u
+		# Make sure that valid hash is never zero, zero means "hash not computed"
+		# Assume a 16-bit mask (to match qstr.c)
+		hash = hash % 65536
+		return (hash == 0 ? 1 : hash)
+	}
+	BEGIN{
+		for(n=0;n<256;n++) {
+			ord[sprintf("%c",n)] = n
+		}
+	}
+	/^static_qstr_list =/,/^]/{
+		if (gsub(/^[^"]*"/, "")) {
+			gsub(/"[^"]*$/, "")
+			o = safeid($0)
+			used[o]=1
+			printf "QDEF0(MP_QSTR_%s, %d, %d, \"%s\")\n", o, hash(), length($0), $0
+		}
+	}
+	/^unsorted_qstr_list =/,/^]/{
+		if (gsub(/^[^"]*"/, "")) {
+			gsub(/"[^"]*$/, "")
+			o = safeid($0)
+			unsorted[o]=1
+		}
+	}
+	/^Q\(.*\)/{
+		gsub(/^Q\(/, "")
+		gsub(/\)$/, "")
+		o = safeid($0)
+		if (!(o in used)) {
+			used[o]=1
+			printf "QDEF%d(MP_QSTR_%s, %d, %d, \"%s\")\n", !(o in unsorted), o, hash(), length($0), $0
+		}
+	}' ../../py/makeqstrdata.py $*
 	exit
 case *
 	echo unknown script $1 >[1=2]
